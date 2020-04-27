@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+set -e
+
+exec 3>&1 # make stdout available as fd 3 for the result
+exec 1>&2 # redirect all output to stderr for logging
+
+SRC_DIR=$1
+payload=$(mktemp "$TMPDIR/rsync-resource-request.XXXXXX")
+cat > "$payload" <&0
+
+SERVER=$(jq -r '.source.server // ""' < $payload)
+USERNAME=$(jq -r '.source.username // ""' < $payload)
+BASE_DIR=$(jq -r '.source.base_dir // ""' < $payload)
+SUB_DIR=$(jq -r '.params.sub_dir // ""' < $payload)
+
+# Setup SSH Key and config
+mkdir -p ~/.ssh
+(jq -r '.source.private_key // empty' < $payload) > ~/.ssh/server_key
+echo -e "Host ${SERVER}\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+chmod -R 600 ~/.ssh
+
+ssh -i ~/.ssh/server_key ${USERNAME}@${SERVER} mkdir -p ${BASE_DIR}
+rsync -av --size-only -e 'ssh -i ~/.ssh/server_key' ${SRC_DIR}/${SUB_DIR}/ ${USERNAME}@${SERVER}:${BASE_DIR}
+
+echo '{"version":{}}' >&3
