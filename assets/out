@@ -13,6 +13,7 @@ SERVER=$(jq -r '.source.server // ""' < $payload)
 USERNAME=$(jq -r '.source.username // ""' < $payload)
 BASE_DIR=$(jq -r '.source.base_dir // ""' < $payload)
 SUB_DIR=$(jq -r '.params.sub_dir // ""' < $payload)
+INCLUDE=$(jq -r '.params.include // ""' < $payload)
 
 # Setup SSH Key and config
 mkdir -p ~/.ssh
@@ -20,7 +21,22 @@ mkdir -p ~/.ssh
 echo -e "Host ${SERVER}\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
 chmod -R 600 ~/.ssh
 
-ssh -i ~/.ssh/server_key ${USERNAME}@${SERVER} mkdir -p ${BASE_DIR}
-rsync -av --size-only -e 'ssh -i ~/.ssh/server_key' ${SRC_DIR}/${SUB_DIR}/ ${USERNAME}@${SERVER}:${BASE_DIR}
+# Create base_dir
+printf "Creating remote destination directory '%s'\n" ${BASE_DIR}
+ssh -i ~/.ssh/server_key ${USERNAME}@${SERVER} mkdir -p ${BASE_DIR} 2> /dev/null
+
+TRANSFER_SRC=${SRC_DIR}/
+if [[ -n "${SUB_DIR}" ]]; then
+  printf "Transfer content from sub-directory '%s' only\n" ${SUB_DIR}
+  TRANSFER_SRC=${SRC_DIR}/${SUB_DIR}/
+fi
+
+if [[ -n "${INCLUDE}" ]]; then
+  printf "Adding include pattern: %s\n\nExecuting transfer\n" ${INCLUDE}
+  rsync -av --size-only --include "${INCLUDE}" --exclude "*" -e 'ssh -i ~/.ssh/server_key' ${TRANSFER_SRC} ${USERNAME}@${SERVER}:${BASE_DIR}/
+else
+  printf "\nExecuting transfer\n"
+  rsync -av --size-only -e 'ssh -i ~/.ssh/server_key' ${TRANSFER_SRC} ${USERNAME}@${SERVER}:${BASE_DIR}/
+fi
 
 echo '{"version":{}}' >&3
