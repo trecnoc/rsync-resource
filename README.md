@@ -28,6 +28,8 @@ Transfer artifacts in `base_dir` on `server` using the specified user credential
 to be sync'd to sync_dir. If not specified everything in the put will be sent
 (which could include container resources, whole build trees etc.)
 
+* `include`: *Optional.* Only include files matching this pattern.
+
 ## Example Configuration
 
 ``` yaml
